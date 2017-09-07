@@ -189,17 +189,13 @@ tzpdx = dateutil.tz.tzfile(&quot;/usr/share/zoneinfo/America/Los_Angeles&quot;)
 time = datetime.datetime.now(tzpdx).strftime(&quot;%Y-%m-%d %I:%M%p&quot;)
 </pre>
 </div>
-<div class="section" id="pelican-blog-update">
-<h2>Pelican blog update</h2>
-<p>Edit files in content directory and run &quot;pelican content&quot; which will
-produce static files in output directory. Copy the output to google app
-engine.:</p>
+<div class="section" id="blog-update">
+<h2>Blog update</h2>
+<p>Edit files in content directory and then run:</p>
 <pre class="literal-block">
-cd ~/pelican; edit content/&lt;files&gt;
-pelican content -s pelicanconf.py
-cd ~/google/google_appengine
-rsync -a output to static
-./appcfg.py update blog-pelican/ # google app engine
+pelican publish
+ghp-import output
+git push -f git&#64;github.com:malahal/malahal.github.io.git gh-pages:master
 </pre>
 </div>
 
