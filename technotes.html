@@ -29,16 +29,51 @@
 
     <div class="entry-content">
 <footer class="post-info">
-        <abbr class="published" title="2013-01-19T00:00:00+05:30">
-                Published: Sat 19 January 2013
+        <abbr class="published" title="2017-09-07T00:00:00+05:30">
+                Published: Thu 07 September 2017
         </abbr>
 
         <address class="vcard author">
                 By                         <a class="url fn" href="https://malahal.github.io/author/malahal-naineni.html">Malahal Naineni</a>
         </address>
 <p>In <a href="https://malahal.github.io/category/technotes.html">technotes</a>.</p>
-<p>tags: <a href="https://malahal.github.io/tag/rsync.html">rsync</a> <a href="https://malahal.github.io/tag/netcat.html">netcat</a> <a href="https://malahal.github.io/tag/tcpdump.html">tcpdump</a> </p>
+<p>tags: <a href="https://malahal.github.io/tag/rsync.html">rsync</a> <a href="https://malahal.github.io/tag/netcat.html">netcat</a> <a href="https://malahal.github.io/tag/tcpdump.html">tcpdump</a> <a href="https://malahal.github.io/tag/iptables.html">iptables</a> </p>
 </footer><!-- /.post-info -->      <p>All in a single page for now!</p>
+<div class="section" id="iptables">
+<h2>iptables</h2>
+<div class="section" id="port-forwarding">
+<h3>port forwarding</h3>
+<p>If you have a virtual machine running NAT'ed default libvirt network and
+want to host a service (e.g. NFSv4 server) using your host's IP address,
+you need to do the following:</p>
+<ul>
+<li><p class="first">Make sure your host can forward packets (aka act as a gateway):</p>
+<pre class="literal-block">
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+</pre>
+</li>
+<li><p class="first">Disable firewall. You don't have to, if you now what you are doing!</p>
+<pre class="literal-block">
+sudo iptables -F
+</pre>
+</li>
+<li><p class="first">Forward tcp NFSv4 packets (aka destination port 2049) to your VM's IP address
+(assume the host ip address is 192.168.1.13 at network interface eth0 and
+your VM's ipaddress is 192.168.122.32):</p>
+<pre class="literal-block">
+sudo iptables -t nat -A PREROUTING -i &lt;eth0&gt; -p tcp --dport 2049 -j DNAT --to-destination 192.168.122.32
+</pre>
+</li>
+</ul>
+<p>Now you can mount from a system in your host's network provided your
+NFSv4 server is configured to allow it:</p>
+<pre class="literal-block">
+mount -overs=4 192.168.1.13:/gpfs/gpfsB /mnt
+</pre>
+<p>You need to forward portmapper port 111 and other side-band protocol ports to
+make NFSv3 work. It is left as an exercise to the reader!</p>
+</div>
+</div>
 <div class="section" id="netcat">
 <h2>netcat</h2>
 <div class="section" id="test-your-network-speed-using-netcat">

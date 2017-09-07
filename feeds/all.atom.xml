@@ -1,93 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/all.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2017-09-01T10:20:00+05:30</updated><entry><title>Problem Determination Guide for Spectrum Scale NFS-Ganesha</title><link href="https://malahal.github.io/problem-determination-guide-for-spectrum-scale-nfs-ganesha.html" rel="alternate"></link><published>2017-09-01T10:20:00+05:30</published><updated>2017-09-01T10:20:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2017-09-01:/problem-determination-guide-for-spectrum-scale-nfs-ganesha.html</id><summary type="html">&lt;p class="first last"&gt;NFS-Ganesha problem determination.&lt;/p&gt;
-</summary><content type="html">&lt;div class="section" id="installation-issues"&gt;
-&lt;h2&gt;Installation issues&lt;/h2&gt;
-&lt;p&gt;nfs-ganesha probject uses libntirpc as a subproject. We currently ship
-libntirpc library code as part of the nfs-ganesha packages. Redhat ships
-libntirpc and nfs-ganesha packages separately. If you already installed
-libntirpc packages from EPEL repository, you will have same files conflicting
-from IBM supplied nfs-ganesha packages. Please remove existing libntirpc
-packages or de-activate yum/dnf repository supplying libntirpc package.&lt;/p&gt;
-&lt;p&gt;Other than the above issue, there shouldn't be any issues as long as you
-installed on supported distributions!&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="section" id="starting-nfs-ganesha-service"&gt;
-&lt;h2&gt;Starting NFS-Ganesha service&lt;/h2&gt;
-&lt;p&gt;&lt;strong&gt;If you are unable to start nfs-ganesha service ganesha.log
-(preferably with FULL_DEBUG mode) and syslog will provide us the most
-valuable information.&lt;/strong&gt; Here are some common issues:&lt;/p&gt;
-&lt;ol class="arabic simple"&gt;
-&lt;li&gt;&lt;strong&gt;SELinux&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;SELinux in some Linux distros prevents nfs-ganesha daemon
-(/usr/bin/ganesha.nfsd) to open /dev/ss0 which is required for exporting
-any GPFS file system exports. You need to disable SELinux or teach
-SELinux to allow ganesha.nfsd daemon to open the /dev/ss0 character
-special file.&lt;/p&gt;
-&lt;ol class="arabic simple" start="2"&gt;
-&lt;li&gt;&lt;strong&gt;Port already in use&lt;/strong&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;Historically, all NFS servers use port 2049 for NFS protocol (it is also
-required for NFSv4). So you can't run two NFS servers at the same time.
-You may have another instance of ganesha daemon already running or it is
-also possible that Linux kernel NFS server is started with or without
-your knowledge!&lt;/p&gt;
-&lt;p&gt;If you want to know the current process using port 2049, you could do:&lt;/p&gt;
-&lt;pre class="literal-block"&gt;
-lsof -i :2049
-&lt;/pre&gt;
-&lt;/div&gt;
-&lt;div class="section" id="issues-mounting-exports-from-nfs-clients"&gt;
-&lt;h2&gt;Issues mounting exports from NFS clients&lt;/h2&gt;
-&lt;p&gt;So you have ganesha NFS server running, but unable to mount an export
-that you think you should. &lt;strong&gt;Network trace is your best friend here. Actually
-network trace is your best friend for any problem post start up!&lt;/strong&gt; Here
-goes a list of issue you may encounter:&lt;/p&gt;
-&lt;ol class="arabic"&gt;
-&lt;li&gt;&lt;p class="first"&gt;&lt;strong&gt;NFSv3 mount failure due to portmapper&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Portmapper (mapping of services to ports) service runs at port 111.
-Your client will send GETPORT request for mountd service to get the
-mountd port number on the NFS server node. NFS mount will fail if
-your server doesn't return mountd port for one reason or the other. A
-classic case is that you start Linux kernel NFS server after starting
-nfs-ganesha server. The Linux kernel NFS server will register it own
-mountd port overwriting nfs-ganesha mountd port.  Eventually, the
-Linux kernel NFS server will fail to come up as it can't bind to 2049
-NFS port, but the damage has already been done.&lt;/p&gt;
-&lt;p&gt;Run &amp;quot;systemctl status nfs&amp;quot; and &amp;quot;systemctl status nfs-ganesha&amp;quot; and see
-how and when they are started. &amp;quot;rpcinfo -p&amp;quot; gives the port numbers
-registered with portmapper. &amp;quot;lsof -i :&amp;lt;port&amp;gt;&amp;quot; gives the current
-process on the system using the port.&lt;/p&gt;
-&lt;p&gt;The best way to guard against accidentally start up of Linux kernel
-NFS server is to unmask the service by doing &amp;quot;systemctl mask nfs&amp;quot;.
-You can also disable it but then someone could accidentally start it,
-so we prefer to mask the Linux kernel NFS service (aka &amp;quot;nfs&amp;quot; on
-Redhat based distros and &amp;quot;nfs-server&amp;quot; on debian based distros)
-service!&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;&lt;p class="first"&gt;&lt;strong&gt;NFSv3 locking failure&lt;/strong&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-&lt;/div&gt;
-&lt;div class="section" id="nfs-client-or-application-hangs"&gt;
-&lt;h2&gt;NFS client or application hangs&lt;/h2&gt;
-&lt;p&gt;In fact, if you
-start Linux kernel NFS server, it will start mountd and register its
-port with portmapper (aka rpcbind) overwriting what nfs-ganesha was
-using, eventually will fail to bind to NFS port 2049. At this point, you
-will not be able to mount any NFSv3 exports.&lt;/p&gt;
-&lt;/div&gt;
-&lt;div class="section" id="ganesha-hangs"&gt;
-&lt;h2&gt;Ganesha hangs&lt;/h2&gt;
-&lt;/div&gt;
-&lt;div class="section" id="ganesha-coredumps"&gt;
-&lt;h2&gt;Ganesha coredumps&lt;/h2&gt;
-&lt;/div&gt;
-&lt;div class="section" id="dynamic-exports"&gt;
-&lt;h2&gt;Dynamic exports&lt;/h2&gt;
-&lt;/div&gt;
-</content><category term="nfs"></category></entry><entry><title>technotes</title><link href="https://malahal.github.io/technotes.html" rel="alternate"></link><published>2013-01-19T00:00:00+05:30</published><updated>2013-01-19T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2013-01-19:/technotes.html</id><summary type="html">&lt;p class="first last"&gt;Technical cheat sheet for my own consumption!&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/all.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2017-09-07T00:00:00+05:30</updated><entry><title>technotes</title><link href="https://malahal.github.io/technotes.html" rel="alternate"></link><published>2017-09-07T00:00:00+05:30</published><updated>2017-09-07T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2017-09-07:/technotes.html</id><summary type="html">&lt;p class="first last"&gt;Technical cheat sheet for my own consumption!&lt;/p&gt;
 </summary><content type="html">&lt;p&gt;All in a single page for now!&lt;/p&gt;
+&lt;div class="section" id="iptables"&gt;
+&lt;h2&gt;iptables&lt;/h2&gt;
+&lt;div class="section" id="port-forwarding"&gt;
+&lt;h3&gt;port forwarding&lt;/h3&gt;
+&lt;p&gt;If you have a virtual machine running NAT'ed default libvirt network and
+want to host a service (e.g. NFSv4 server) using your host's IP address,
+you need to do the following:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;Make sure your host can forward packets (aka act as a gateway):&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Disable firewall. You don't have to, if you now what you are doing!&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+sudo iptables -F
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Forward tcp NFSv4 packets (aka destination port 2049) to your VM's IP address
+(assume the host ip address is 192.168.1.13 at network interface eth0 and
+your VM's ipaddress is 192.168.122.32):&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+sudo iptables -t nat -A PREROUTING -i &amp;lt;eth0&amp;gt; -p tcp --dport 2049 -j DNAT --to-destination 192.168.122.32
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Now you can mount from a system in your host's network provided your
+NFSv4 server is configured to allow it:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+mount -overs=4 192.168.1.13:/gpfs/gpfsB /mnt
+&lt;/pre&gt;
+&lt;p&gt;You need to forward portmapper port 111 and other side-band protocol ports to
+make NFSv3 work. It is left as an exercise to the reader!&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
 &lt;div class="section" id="netcat"&gt;
 &lt;h2&gt;netcat&lt;/h2&gt;
 &lt;div class="section" id="test-your-network-speed-using-netcat"&gt;
@@ -216,4 +164,91 @@ rsync -a output to static
 ./appcfg.py update blog-pelican/ # google app engine
 &lt;/pre&gt;
 &lt;/div&gt;
-</content><category term="rsync"></category><category term="netcat"></category><category term="tcpdump"></category></entry></feed>
+</content><category term="rsync"></category><category term="netcat"></category><category term="tcpdump"></category><category term="iptables"></category></entry><entry><title>Problem Determination Guide for Spectrum Scale NFS-Ganesha</title><link href="https://malahal.github.io/problem-determination-guide-for-spectrum-scale-nfs-ganesha.html" rel="alternate"></link><published>2017-09-01T10:20:00+05:30</published><updated>2017-09-01T10:20:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2017-09-01:/problem-determination-guide-for-spectrum-scale-nfs-ganesha.html</id><summary type="html">&lt;p class="first last"&gt;NFS-Ganesha problem determination.&lt;/p&gt;
+</summary><content type="html">&lt;div class="section" id="installation-issues"&gt;
+&lt;h2&gt;Installation issues&lt;/h2&gt;
+&lt;p&gt;nfs-ganesha probject uses libntirpc as a subproject. We currently ship
+libntirpc library code as part of the nfs-ganesha packages. Redhat ships
+libntirpc and nfs-ganesha packages separately. If you already installed
+libntirpc packages from EPEL repository, you will have same files conflicting
+from IBM supplied nfs-ganesha packages. Please remove existing libntirpc
+packages or de-activate yum/dnf repository supplying libntirpc package.&lt;/p&gt;
+&lt;p&gt;Other than the above issue, there shouldn't be any issues as long as you
+installed on supported distributions!&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="starting-nfs-ganesha-service"&gt;
+&lt;h2&gt;Starting NFS-Ganesha service&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;If you are unable to start nfs-ganesha service ganesha.log
+(preferably with FULL_DEBUG mode) and syslog will provide us the most
+valuable information.&lt;/strong&gt; Here are some common issues:&lt;/p&gt;
+&lt;ol class="arabic simple"&gt;
+&lt;li&gt;&lt;strong&gt;SELinux&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;SELinux in some Linux distros prevents nfs-ganesha daemon
+(/usr/bin/ganesha.nfsd) to open /dev/ss0 which is required for exporting
+any GPFS file system exports. You need to disable SELinux or teach
+SELinux to allow ganesha.nfsd daemon to open the /dev/ss0 character
+special file.&lt;/p&gt;
+&lt;ol class="arabic simple" start="2"&gt;
+&lt;li&gt;&lt;strong&gt;Port already in use&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Historically, all NFS servers use port 2049 for NFS protocol (it is also
+required for NFSv4). So you can't run two NFS servers at the same time.
+You may have another instance of ganesha daemon already running or it is
+also possible that Linux kernel NFS server is started with or without
+your knowledge!&lt;/p&gt;
+&lt;p&gt;If you want to know the current process using port 2049, you could do:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+lsof -i :2049
+&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div class="section" id="issues-mounting-exports-from-nfs-clients"&gt;
+&lt;h2&gt;Issues mounting exports from NFS clients&lt;/h2&gt;
+&lt;p&gt;So you have ganesha NFS server running, but unable to mount an export
+that you think you should. &lt;strong&gt;Network trace is your best friend here. Actually
+network trace is your best friend for any problem post start up!&lt;/strong&gt; Here
+goes a list of issue you may encounter:&lt;/p&gt;
+&lt;ol class="arabic"&gt;
+&lt;li&gt;&lt;p class="first"&gt;&lt;strong&gt;NFSv3 mount failure due to portmapper&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Portmapper (mapping of services to ports) service runs at port 111.
+Your client will send GETPORT request for mountd service to get the
+mountd port number on the NFS server node. NFS mount will fail if
+your server doesn't return mountd port for one reason or the other. A
+classic case is that you start Linux kernel NFS server after starting
+nfs-ganesha server. The Linux kernel NFS server will register it own
+mountd port overwriting nfs-ganesha mountd port.  Eventually, the
+Linux kernel NFS server will fail to come up as it can't bind to 2049
+NFS port, but the damage has already been done.&lt;/p&gt;
+&lt;p&gt;Run &amp;quot;systemctl status nfs&amp;quot; and &amp;quot;systemctl status nfs-ganesha&amp;quot; and see
+how and when they are started. &amp;quot;rpcinfo -p&amp;quot; gives the port numbers
+registered with portmapper. &amp;quot;lsof -i :&amp;lt;port&amp;gt;&amp;quot; gives the current
+process on the system using the port.&lt;/p&gt;
+&lt;p&gt;The best way to guard against accidentally start up of Linux kernel
+NFS server is to unmask the service by doing &amp;quot;systemctl mask nfs&amp;quot;.
+You can also disable it but then someone could accidentally start it,
+so we prefer to mask the Linux kernel NFS service (aka &amp;quot;nfs&amp;quot; on
+Redhat based distros and &amp;quot;nfs-server&amp;quot; on debian based distros)
+service!&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;&lt;strong&gt;NFSv3 locking failure&lt;/strong&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;div class="section" id="nfs-client-or-application-hangs"&gt;
+&lt;h2&gt;NFS client or application hangs&lt;/h2&gt;
+&lt;p&gt;In fact, if you
+start Linux kernel NFS server, it will start mountd and register its
+port with portmapper (aka rpcbind) overwriting what nfs-ganesha was
+using, eventually will fail to bind to NFS port 2049. At this point, you
+will not be able to mount any NFSv3 exports.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class="section" id="ganesha-hangs"&gt;
+&lt;h2&gt;Ganesha hangs&lt;/h2&gt;
+&lt;/div&gt;
+&lt;div class="section" id="ganesha-coredumps"&gt;
+&lt;h2&gt;Ganesha coredumps&lt;/h2&gt;
+&lt;/div&gt;
+&lt;div class="section" id="dynamic-exports"&gt;
+&lt;h2&gt;Dynamic exports&lt;/h2&gt;
+&lt;/div&gt;
+</content><category term="nfs"></category></entry></feed>

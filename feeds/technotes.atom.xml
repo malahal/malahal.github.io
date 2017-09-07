@@ -1,6 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog - technotes</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/technotes.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2013-01-19T00:00:00+05:30</updated><entry><title>technotes</title><link href="https://malahal.github.io/technotes.html" rel="alternate"></link><published>2013-01-19T00:00:00+05:30</published><updated>2013-01-19T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2013-01-19:/technotes.html</id><summary type="html">&lt;p class="first last"&gt;Technical cheat sheet for my own consumption!&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog - technotes</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/technotes.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2017-09-07T00:00:00+05:30</updated><entry><title>technotes</title><link href="https://malahal.github.io/technotes.html" rel="alternate"></link><published>2017-09-07T00:00:00+05:30</published><updated>2017-09-07T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2017-09-07:/technotes.html</id><summary type="html">&lt;p class="first last"&gt;Technical cheat sheet for my own consumption!&lt;/p&gt;
 </summary><content type="html">&lt;p&gt;All in a single page for now!&lt;/p&gt;
+&lt;div class="section" id="iptables"&gt;
+&lt;h2&gt;iptables&lt;/h2&gt;
+&lt;div class="section" id="port-forwarding"&gt;
+&lt;h3&gt;port forwarding&lt;/h3&gt;
+&lt;p&gt;If you have a virtual machine running NAT'ed default libvirt network and
+want to host a service (e.g. NFSv4 server) using your host's IP address,
+you need to do the following:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p class="first"&gt;Make sure your host can forward packets (aka act as a gateway):&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Disable firewall. You don't have to, if you now what you are doing!&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+sudo iptables -F
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Forward tcp NFSv4 packets (aka destination port 2049) to your VM's IP address
+(assume the host ip address is 192.168.1.13 at network interface eth0 and
+your VM's ipaddress is 192.168.122.32):&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+sudo iptables -t nat -A PREROUTING -i &amp;lt;eth0&amp;gt; -p tcp --dport 2049 -j DNAT --to-destination 192.168.122.32
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Now you can mount from a system in your host's network provided your
+NFSv4 server is configured to allow it:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+mount -overs=4 192.168.1.13:/gpfs/gpfsB /mnt
+&lt;/pre&gt;
+&lt;p&gt;You need to forward portmapper port 111 and other side-band protocol ports to
+make NFSv3 work. It is left as an exercise to the reader!&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
 &lt;div class="section" id="netcat"&gt;
 &lt;h2&gt;netcat&lt;/h2&gt;
 &lt;div class="section" id="test-your-network-speed-using-netcat"&gt;
@@ -129,4 +164,4 @@ rsync -a output to static
 ./appcfg.py update blog-pelican/ # google app engine
 &lt;/pre&gt;
 &lt;/div&gt;
-</content><category term="rsync"></category><category term="netcat"></category><category term="tcpdump"></category></entry></feed>
+</content><category term="rsync"></category><category term="netcat"></category><category term="tcpdump"></category><category term="iptables"></category></entry></feed>
