@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog - images</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/images.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2018-03-30T00:00:00+05:30</updated><entry><title>Images</title><link href="https://malahal.github.io/images.html" rel="alternate"></link><published>2018-03-30T00:00:00+05:30</published><updated>2018-03-30T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2018-03-30:/images.html</id><summary type="html">&lt;p class="first last"&gt;Testing images&lt;/p&gt;
+</summary><content type="html">&lt;img alt="Just testing pics" src="/home/malahal/pelican/content/images/IMG_2373.JPG" style="width: 1024.0px; height: 683.0px;" /&gt;
+&lt;img alt="Just testing pics2" src="/home/malahal/pelican/content/images/IMG_4358.jpg" style="width: 468.2px; height: 452.0px;" /&gt;
+&lt;pre class="code python literal-block"&gt;
+&lt;span class="k"&gt;def&lt;/span&gt; &lt;span class="nf"&gt;my_function&lt;/span&gt;&lt;span class="p"&gt;():&lt;/span&gt;
+    &lt;span class="s2"&gt;&amp;quot;just a test&amp;quot;&lt;/span&gt;
+    &lt;span class="k"&gt;print&lt;/span&gt; &lt;span class="mi"&gt;8&lt;/span&gt;&lt;span class="o"&gt;/&lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;
+&lt;/pre&gt;
+</content><category term="images"></category></entry></feed>

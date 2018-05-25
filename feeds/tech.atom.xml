@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Malahal blog - tech</title><link href="https://malahal.github.io/" rel="alternate"></link><link href="https://malahal.github.io/feeds/tech.atom.xml" rel="self"></link><id>https://malahal.github.io/</id><updated>2018-05-25T00:00:00+05:30</updated><entry><title>How does in6_pktinfo work?</title><link href="https://malahal.github.io/how-does-in6_pktinfo-work.html" rel="alternate"></link><published>2018-05-25T00:00:00+05:30</published><updated>2018-05-25T00:00:00+05:30</updated><author><name>Malahal Naineni</name></author><id>tag:malahal.github.io,2018-05-25:/how-does-in6_pktinfo-work.html</id><summary type="html">&lt;p class="first last"&gt;How does in6_pktinfo work?&lt;/p&gt;
+</summary><content type="html">&lt;div class="section" id="id1"&gt;
+&lt;h2&gt;How does in6_pktinfo work?&lt;/h2&gt;
+&lt;p&gt;The following code used to work just fine with RHEL7.3 kernels and
+older. I will demonstrate that this code works in RHEL6.7 (a VM that I
+have on my laptop) and fails in CentOS7.5 (another VM). What I found is
+that RHEL7.3 and older kernels only give in_pktinfo (never in6_pktinfo).
+They essentially worked as IPv4 sockets for this control message. Note
+that we do enable both &amp;quot;IPPROTO_IP, IP_PKTINFO&amp;quot; and &amp;quot;IPPROTO_IPV6,
+IPV6_RECVPKTINFO&amp;quot; on the socket. If we enable only IPV6_RECVPKTINFO,
+RHEL6.7 fails to provide any PKTINFO control data at all. :-(&lt;/p&gt;
+&lt;p&gt;RHEL7.4 and later kernels provide both in_pktinfo and in6_pktinfo, but
+don't work if we use in6_pktinfo while sending the response! There must
+be something in this program that I am doing wrong with in6_pktinfo?&lt;/p&gt;
+&lt;p&gt;Here is the source of the pktinfo server code in pktinfo.c:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+#define _GNU_SOURCE
+#include &amp;lt;netinet/in.h&amp;gt;
+#include &amp;lt;sys/types.h&amp;gt;
+#include &amp;lt;sys/socket.h&amp;gt;
+#include &amp;lt;string.h&amp;gt;
+#include &amp;lt;stdio.h&amp;gt;
+#include &amp;lt;unistd.h&amp;gt;
+#include &amp;lt;stdlib.h&amp;gt;
+#include &amp;lt;stdbool.h&amp;gt;
+
+/* All globals we need here except socket fd !! */
+struct store {
+    struct sockaddr_in6 from;
+    struct in_pktinfo in_pktinfo;
+    struct in6_pktinfo in6_pktinfo;
+    bool pktinfo4;
+    bool pktinfo6;
+} store;
+int fd; /* Socket fd */
+
+static void create_socket(int port);
+static void receive();
+static void respond();
+int main(int argc, char *argv[])
+{
+    int port;
+
+    if (argc != 2) {
+        fprintf(stderr, &amp;quot;usage: %s &amp;lt;port&amp;gt;\n&amp;quot;, argv[0]);
+        exit(1);
+    }
+
+    port = strtol(argv[1], NULL, 10);
+    create_socket(port);
+    for (;;) {
+        receive(fd, &amp;amp;store);
+        respond(fd, &amp;amp;store);
+    }
+}
+
+static void create_socket(int port)
+{
+    int enable = 1;
+    struct sockaddr_in6 sin6 = {0};
+    int ret;
+
+    fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        perror(&amp;quot;socket call failed&amp;quot;);
+        exit(1);
+    }
+
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &amp;amp;enable, sizeof(enable));
+    setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &amp;amp;enable, sizeof(enable));
+    setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &amp;amp;enable, sizeof(enable));
+
+    sin6.sin6_family = AF_INET6;
+    sin6.sin6_port = htons(port);
+    ret = bind(fd, (struct sockaddr*)&amp;amp;sin6, sizeof(sin6));
+    if (ret == -1) {
+        perror(&amp;quot;bind failed&amp;quot;);
+        exit(1);
+    }
+}
+
+static void receive(int fd, struct store *store)
+{
+    struct iovec iovec[1];
+    struct msghdr msg;
+    char msg_control[1024];
+    char buf[1500];
+    struct cmsghdr* cmsg;
+    int ret;
+
+    iovec[0].iov_base = buf;
+    iovec[0].iov_len = sizeof(buf);
+    msg.msg_iov = iovec;
+    msg.msg_iovlen = 1;
+    msg.msg_name = &amp;amp;store-&amp;gt;from;
+    msg.msg_namelen = sizeof(store-&amp;gt;from);
+    msg.msg_control = msg_control;
+    msg.msg_controllen = sizeof(msg_control);
+    msg.msg_flags = 0;
+
+    ret = recvmsg(fd, &amp;amp;msg, 0);
+    if (ret == -1) {
+        perror(&amp;quot;recvmsg failed&amp;quot;);
+        exit(1);
+    }
+    printf(&amp;quot;received bytes len: %d\n&amp;quot;, ret);
+
+    store-&amp;gt;pktinfo4 = false;
+    store-&amp;gt;pktinfo6 = false;
+    for (cmsg = CMSG_FIRSTHDR(&amp;amp;msg); cmsg != 0; cmsg = CMSG_NXTHDR(&amp;amp;msg, cmsg))
+    {
+        if (cmsg-&amp;gt;cmsg_level == IPPROTO_IP &amp;amp;&amp;amp; cmsg-&amp;gt;cmsg_type == IP_PKTINFO)
+        {
+            store-&amp;gt;in_pktinfo = *(struct in_pktinfo*)CMSG_DATA(cmsg);
+            store-&amp;gt;pktinfo4 = true;
+            printf(&amp;quot;pktinfo4 True\n&amp;quot;);
+        }
+        if (cmsg-&amp;gt;cmsg_level == IPPROTO_IPV6 &amp;amp;&amp;amp; cmsg-&amp;gt;cmsg_type == IPV6_PKTINFO)
+        {
+            store-&amp;gt;in6_pktinfo = *(struct in6_pktinfo*)CMSG_DATA(cmsg);
+            store-&amp;gt;pktinfo6 = true;
+            printf(&amp;quot;pktinfo6 True\n&amp;quot;);
+        }
+    }
+}
+
+static void respond(int fd, struct store *store)
+{
+    char *resp = &amp;quot;This is PKT6INFO test server\n&amp;quot;;
+    struct iovec iovec[1];
+    struct msghdr msg;
+    char msg_control[1024];
+    struct cmsghdr *cmsg;
+    int control_len;
+    int ret;
+
+    iovec[0].iov_base = resp;
+    iovec[0].iov_len = strlen(resp);
+    msg.msg_name = &amp;amp;store-&amp;gt;from;
+    msg.msg_namelen = sizeof(store-&amp;gt;from);
+    msg.msg_iov = iovec;
+    msg.msg_iovlen = 1;
+    msg.msg_control = msg_control;
+    msg.msg_controllen = sizeof(msg_control);
+    msg.msg_flags = 0;
+
+    control_len = 0;
+    cmsg = CMSG_FIRSTHDR(&amp;amp;msg);
+    if (store-&amp;gt;pktinfo6)
+    {
+        cmsg-&amp;gt;cmsg_level = IPPROTO_IPV6;
+        cmsg-&amp;gt;cmsg_type = IPV6_PKTINFO;
+        *(struct in6_pktinfo*)CMSG_DATA(cmsg) = store-&amp;gt;in6_pktinfo;
+        cmsg-&amp;gt;cmsg_len = CMSG_LEN(sizeof(store-&amp;gt;in6_pktinfo));
+        control_len = CMSG_SPACE(sizeof(store-&amp;gt;in6_pktinfo));
+        printf(&amp;quot;Using in6_pktinfo\n&amp;quot;);
+    } else if (store-&amp;gt;pktinfo4) {
+        cmsg-&amp;gt;cmsg_level = IPPROTO_IP;
+        cmsg-&amp;gt;cmsg_type = IP_PKTINFO;
+        *(struct in_pktinfo*)CMSG_DATA(cmsg) = store-&amp;gt;in_pktinfo;
+        cmsg-&amp;gt;cmsg_len = CMSG_LEN(sizeof(store-&amp;gt;in_pktinfo));
+        control_len = CMSG_SPACE(sizeof(store-&amp;gt;in_pktinfo));
+        printf(&amp;quot;Using in_pktinfo\n&amp;quot;);
+    }
+    msg.msg_controllen = control_len;
+
+    ret = sendmsg(fd, &amp;amp;msg, 0);
+    if (ret == -1) {
+        perror(&amp;quot;sendmsg failed&amp;quot;);
+        exit(1);
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;All the above code does is, it reads UDP packets over the given port, and then
+responds with &amp;quot;This is PKT6INFO test server&amp;quot; message. We will use netcat to act
+as our client!&lt;/p&gt;
+&lt;div class="section" id="here-are-the-steps-to-run-the-above-server-and-see-it-working-on-rhel6-7"&gt;
+&lt;h3&gt;Here are the steps to run the above server and see it working on RHEL6.7&lt;/h3&gt;
+&lt;ol class="arabic"&gt;
+&lt;li&gt;&lt;p class="first"&gt;vm1 is running RHEL6.7, let us copy the code there and compile
+pktinfo server:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+$ ssh root&amp;#64;vm1 uname -a
+Linux vm1 2.6.32-573.7.1.el6.x86_64 #1 SMP Thu Sep 10 13:42:16 EDT 2015 x86_64 x86_64 x86_64 GNU/Linux
+
+scp pktinfo.c root&amp;#64;vm1:
+ssh root&amp;#64;vm1 &amp;quot;make pktinfo&amp;quot;
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;vm1's ip address is 192.168.122.31, I also created a bunch of IP aliases as you can see here:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+[root&amp;#64;vm1 ~]# ip addr show dev eth0
+2: eth0: &amp;lt;BROADCAST,MULTICAST,UP,LOWER_UP&amp;gt; mtu 1300 qdisc pfifo_fast state UP qlen 1000
+    link/ether 52:54:00:07:5c:31 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.122.31/24 brd 192.168.122.255 scope global eth0
+    inet 192.168.122.200/24 brd 192.168.122.255 scope global secondary eth0:0
+    inet 192.168.122.201/24 brd 192.168.122.255 scope global secondary eth0:1
+    inet 192.168.122.202/24 brd 192.168.122.255 scope global secondary eth0:2
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Run our pktinfo server on vm1. Run it in foreground to see its output:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+[root&amp;#64;vm1 ~]# /root/pktinfo 8888
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Run tshark to see the frames while we run our netcat client:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+tshark -i eth0 -w /tmp/pktinfo.cap port 8888
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Finally, our netcat client in UDP (we pass STDIN to netcat so that it
+prints response from our pktinfo server!, control-C to terminate
+netcat!):&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+[root&amp;#64;vm2 ~]# cat &amp;lt;(echo command) - | nc -u 192.168.122.202 8888
+This is PKT6INFO test server
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p class="first"&gt;Note that our server prints the following on its stdout:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+received bytes len: 8
+pktinfo4 True
+Using in_pktinfo
+&lt;/pre&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;If you run the pktinfo server on RHEL7.[45], your netcat won't print our
+pktinfo server response message! Network trace will indicate that our
+server sends a response to netcat using a different source IP address
+than the destination address of the netcat message. Also, notice that
+the output from the pktinfo server is:&lt;/p&gt;
+&lt;pre class="literal-block"&gt;
+received bytes len: 8
+pktinfo6 True
+pktinfo4 True
+Using in6_pktinfo
+&lt;/pre&gt;
+&lt;p&gt;The kernel is sending IP_PKTINFO as well as IPV6_PKTINFO, it works only
+when we use IP_PKTINFO while sending a UDP packet (I did re-arrange the
+pktinfo.c code to use in_pktinfo first, then things work in RHEL7.4
+kernel as well. Looks like there is a bug in this code or in the kernel.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</content><category term="netcat"></category><category term="pktinfo"></category><category term="PKTINFO"></category></entry></feed>
